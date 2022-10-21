@@ -1,0 +1,19 @@
+[binaries]
+c = ['riscv32-unknown-elf-gcc', '-nostdlib']
+ar = 'riscv32-unknown-elf-ar'
+as = 'riscv32-unknown-elf-as'
+nm = 'riscv32-unknown-elf-nm'
+strip = 'riscv32-unknown-elf-strip'
+# only needed to run tests
+exe_wrapper = ['sh', '-c', 'test -z "$PICOLIBC_TEST" || run-rv32imc "$@"', 'run-rv32imc']
+
+[host_machine]
+system = 'unknown'
+cpu_family = 'riscv32'
+cpu = 'riscv32'
+endian = 'little'
+
+[properties]
+c_args = ['-msave-restore', '-fshort-enums', '-march=rv32imc', '-mabi=ilp32']
+c_link_args = ['-msave-restore', '-fshort-enums', '-march=rv32imc', '-mabi=ilp32']
+skip_sanity_check = true
