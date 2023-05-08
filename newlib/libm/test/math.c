@@ -432,6 +432,7 @@ run_vector_1 (int vector,
   double result;
   float fresult;
 
+#if 0
   if (vector)
   {
 
@@ -483,6 +484,7 @@ run_vector_1 (int vector,
       return;
     }
   }
+#endif
 
   newfunc(name);
   while (p->line)
@@ -611,7 +613,7 @@ run_vector_1 (int vector,
      }
     p++;
   }
-  if (vector)
+  if (vector && f)
   {
     VECCLOSE(f, name, args);
   }

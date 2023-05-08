@@ -36,14 +36,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #define check(condition, message) do {                  \
         if (!(condition)) {                             \
             printf("%s: %s\n", message, #condition);    \
             if (f)                                      \
                 fclose(f);                              \
-            (void) unlink(template);                    \
+            (void) remove(template);                    \
             exit(1);                                    \
         }                                               \
     } while(0)
@@ -102,8 +101,9 @@ main(void)
     check(f != NULL, "fopen w");
     fputs(MESSAGE, f);
     fclose(f);
+    f = NULL;
     check_contents(template, 1);
-    (void) unlink(template);
+    (void) remove(template);
 
     /* Create temp file */
     strcpy(template, NAME_TEMPLATE);
@@ -115,8 +115,9 @@ main(void)
     check(f != NULL, "fopen w");
     fputs(MESSAGE, f);
     fclose(f);
+    f = NULL;
     check_contents(template, 1);
-    (void) unlink(template);
+    (void) remove(template);
 
     /* Create temp file with extension */
     strcpy(template, NAME_TEMPLATE_EXT);
@@ -131,7 +132,7 @@ main(void)
     fputs(MESSAGE, f);
     fclose(f);
     check_contents(template, 1);
-    (void) unlink(template);
+    (void) remove(template);
 
     exit(0);
 }

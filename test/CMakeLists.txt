@@ -40,6 +40,7 @@ set(tests
   regex
   ungetc
   fenv
+  long_double
   math_errhandling
   malloc
   tls
@@ -69,6 +70,8 @@ function(picolibc_test test)
   target_link_libraries(${test} LINK_PUBLIC ${PICOLIBC_TEST_LINK_LIBRARIES})
 
   target_compile_options(${test} PRIVATE "-fno-builtin" ${PICOLIBC_COMPILE_OPTIONS})
+
+  target_link_options(${test} PRIVATE ${TARGET_COMPILE_OPTIONS})
 
   add_test(
     NAME ${test}

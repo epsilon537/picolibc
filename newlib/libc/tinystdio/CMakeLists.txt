@@ -36,10 +36,12 @@ picolibc_sources(
   asprintf.c
   bufio.c
   clearerr.c
+  compare_exchange.c
   ecvt_r.c
   ecvt.c
   ecvtf_r.c
   ecvtf.c
+  exchange.c
   fcvt.c
   fcvt_r.c
   fcvtf.c
@@ -53,14 +55,19 @@ picolibc_sources(
   fflush.c
   fgetc.c
   fgets.c
+  fgetwc.c
+  fgetws.c
   fileno.c
   filestrget.c
   filestrput.c
   filestrputalloc.c
+  filewstrget.c
   fmemopen.c
   fprintf.c
   fputc.c
   fputs.c
+  fputwc.c
+  fputws.c
   fread.c
   freopen.c
   fscanf.c
@@ -68,15 +75,23 @@ picolibc_sources(
   fseeko.c
   ftell.c
   ftello.c
+  fwide.c
   fwrite.c
+  fwprintf.c
+  fwscanf.c
   getchar.c
+  getdelim.c
+  getline.c
   gets.c
+  getwchar.c
   matchcaseprefix.c
   mktemp.c
   perror.c
   printf.c
   putchar.c
   puts.c
+  putwchar.c
+  remove.c
   rewind.c
   scanf.c
   setbuf.c
@@ -96,7 +111,18 @@ picolibc_sources(
   strtof_l.c
   strtod.c
   strtod_l.c
+  strtoimax.c
+  strtol.c
+  strtoll.c
+  strtoul.c
+  strtoull.c
+  strtoumax.c
+  swprintf.c
+  swscanf.c
+  tmpnam.c
+  tmpfile.c
   ungetc.c
+  ungetwc.c
   vasprintf.c
   vfiprintf.c
   vfprintf.c
@@ -104,11 +130,17 @@ picolibc_sources(
   vfscanf.c
   vfiscanf.c
   vfscanff.c
+  vfwprintf.c
+  vfwscanf.c
   vprintf.c
   vscanf.c
   vsscanf.c
   vsnprintf.c
   vsprintf.c
+  vswprintf.c
+  vswscanf.c
+  wprintf.c
+  wscanf.c
   dtoa_ryu.c
   ftoa_ryu.c
   ryu_table.c

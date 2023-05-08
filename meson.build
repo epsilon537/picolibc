@@ -42,7 +42,7 @@ project('picolibc', 'c',
 	],
 	license : 'BSD',
 	meson_version : '>= 0.53',
-	version: '1.7.8'
+	version: '1.8.1'
        )
 
 targets = []
@@ -50,6 +50,21 @@ targets = []
 fs = import('fs')
 
 cc = meson.get_compiler('c')
+
+# Find the compiler installation directory by parsing the output of
+# cc -print-search-dirs
+
+cc_install_dir = ''
+foreach _line : run_command(cc.cmd_array() + ['-print-search-dirs'], check : false).stdout().split('\n')
+  if _line.startswith('install: ')
+    if meson.version().version_compare('>=0.56')
+      # trim off the leading 'install: '
+      cc_install_dir = _line.substring(9)
+    else
+      cc_install_dir = run_command(['expr', _line, ':', 'install: *\(.*\)'], check : false).stdout().split('\n')[0]
+    endif
+  endif
+endforeach
 
 # these options are required for all C compiler operations, including
 # detecting many C compiler features, as we cannot expect there
@@ -78,6 +93,8 @@ cpu_family_aliases = {
 		       'fido' : 'm68k',
 		       # m88k
 		       'm88110' : 'm88k',
+		       # Microblaze
+		       'microblazeel' : 'microblaze',
 		       # or1k
 		       'or1knd': 'or1k',
 		       # powerpc
@@ -112,7 +129,7 @@ Unsupported architecture: "@0@"
   error(message.format(host_cpu_family))
 endif
 
-# Find out about long double type
+# Find out about float types
 
 long_double_code = '''
 #include <float.h>
@@ -127,39 +144,35 @@ long double test()
 '''
 have_long_double = cc.compiles(long_double_code, name : 'long double check', args: core_c_args)
 
-long_double_size_code = '''
+have_sizeof_float = cc.get_define('__SIZEOF_FLOAT__') != ''
+have_sizeof_double = cc.get_define('__SIZEOF_DOUBLE__') != ''
+have_sizeof_long_double = have_long_double and cc.get_define('__SIZEOF_LONG_DOUBLE__') != ''
+
+set_double_equals_float = not have_sizeof_float or not have_sizeof_double
+
+if set_double_equals_float
+  float_double_code = '''
+char size_test[sizeof(float) == sizeof(double) ? 1 : -1];
+'''
+  set_double_equals_float = 
+  double_equals_float = cc.compiles(float_double_code, name : 'double same as float', args : core_c_args)
+endif
+
+set_long_double_equals_double = not have_sizeof_double or not have_sizeof_long_double
+
+if set_long_double_equals_double
+  long_double_size_code = '''
 #include <float.h>
 char size_test[sizeof(double) == sizeof(long double) ? 1 : -1];
 '''
-
-long_double_mant_64_code = '''
-#include <float.h>
-char size_test[__LDBL_MANT_DIG__ == 64 ? 1 : -1];
-'''
-
-long_double_mant_113_code = '''
-#include <float.h>
-char size_test[__LDBL_MANT_DIG__ == 113 ? 1 : -1];
-'''
-
-if have_long_double
   long_double_equals_double = cc.compiles(long_double_size_code, name : 'long double same as double', args: core_c_args)
-  if not long_double_equals_double
-    long_double_mant_is_64 = cc.compiles(long_double_mant_64_code, name : 'long double mantissa is 64 bits', args: core_c_args)
-    long_double_mant_is_113 = cc.compiles(long_double_mant_113_code, name : 'long double mantissa is 113 bits', args: core_c_args)
-  endif
 endif
-
-float_double_code = '''
-char size_test[sizeof(float) == sizeof(double) ? 1 : -1];
-'''
-
-double_equals_float = cc.compiles(float_double_code, name : 'double same as float', args : core_c_args)
 
 enable_multilib = get_option('multilib')
 multilib_list = get_option('multilib-list')
 enable_picolib = get_option('picolib')
 enable_picocrt = get_option('picocrt')
+enable_picocrt_lib = get_option('picocrt-lib')
 enable_semihost = get_option('semihost')
 enable_tests = get_option('tests')
 enable_native_tests = get_option('native-tests')
@@ -186,6 +199,10 @@ native_c_args = ['-DNO_NEWLIB']
 
 if get_option('profile')
   c_args += ['-pg', '-no-pie']
+endif
+
+if get_option('freestanding')
+  c_args += ['-ffreestanding']
 endif
 
 # Disable ssp and fortify source while building picolibc (it's enabled
@@ -266,14 +283,34 @@ posix_console = posix_io and get_option('posix-console')
 io_float_exact = not tinystdio or get_option('io-float-exact')
 atomic_ungetc = tinystdio and get_option('atomic-ungetc')
 format_default = get_option('format-default')
+printf_aliases = get_option('printf-aliases')
+io_percent_b = tinystdio and get_option('io-percent-b')
+io_long_double = get_option('io-long-double') or get_option('newlib-io-long-double')
 
-double_printf_compile_args=['-DPICOLIBC_DOUBLE_PRINTF_SCANF']
+if printf_aliases
+  double_printf_compile_args=['-DPICOLIBC_DOUBLE_PRINTF_SCANF']
+  float_printf_compile_args=['-DPICOLIBC_FLOAT_PRINTF_SCANF']
+  int_printf_compile_args=['-DPICOLIBC_INTEGER_PRINTF_SCANF']
+else
+  double_printf_compile_args=[]
+  float_printf_compile_args=[]
+  int_printf_compile_args=[]
+endif
 double_printf_link_args=double_printf_compile_args
-float_printf_compile_args=['-DPICOLIBC_FLOAT_PRINTF_SCANF']
 float_printf_link_args=float_printf_compile_args
-int_printf_compile_args=['-DPICOLIBC_INTEGER_PRINTF_SCANF']
 int_printf_link_args=int_printf_compile_args
+
 if tinystdio
+  if format_default == 'double'
+    c_args += '-DFORMAT_DEFAULT_DOUBLE'
+  elif format_default == 'float'
+    c_args += '-DFORMAT_DEFAULT_FLOAT'
+  elif format_default == 'integer'
+    c_args += '-DFORMAT_DEFAULT_INTEGER'
+  endif
+endif
+
+if tinystdio and printf_aliases
   vfprintf_symbol = global_prefix + 'vfprintf'
   __d_vfprintf_symbol = global_prefix + '__d_vfprintf'
   __f_vfprintf_symbol = global_prefix + '__f_vfprintf'
@@ -282,14 +319,6 @@ if tinystdio
   __d_vfscanf_symbol = global_prefix + '__d_vfscanf'
   __f_vfscanf_symbol = global_prefix + '__f_vfscanf'
   __i_vfscanf_symbol = global_prefix + '__i_vfscanf'
-
-  if format_default == 'double'
-    c_args += '-DFORMAT_DEFAULT_DOUBLE'
-  elif format_default == 'float'
-    c_args += '-DFORMAT_DEFAULT_FLOAT'
-  elif format_default == 'integer'
-    c_args += '-DFORMAT_DEFAULT_INTEGER'
-  endif
 
   if has_link_defsym
     if format_default != 'double'
@@ -335,11 +364,16 @@ if tinystdio
       int_printf_link_args += '-Wl,-alias,' + __i_vfprintf_symbol +  ',' + vfprintf_symbol
       int_printf_link_args += '-Wl,-alias,' + __i_vfscanf_symbol + ',' + vfscanf_symbol
     endif
+  else
+    if enable_tests
+      # If the alias flag is not supported and we are building tests, emit an
+      # error here to avoid surprising test failures.
+      error('Symbol alias linker flag not supported - printf tests will fail!')
+    endif
   endif
 endif
 
 # A bunch of newlib-stdio only options
-newlib_io_long_double = get_option('newlib-io-long-double')
 newlib_global_stdio_streams = get_option('newlib-global-stdio-streams')
 newlib_fvwrite_in_streamio = get_option('newlib-fvwrite-in-streamio')
 newlib_fseek_optimization = get_option('newlib-fseek-optimization')
@@ -353,9 +387,6 @@ newlib_have_fcntl = get_option('newlib-have-fcntl')
 # if they are selected while using tinystdio
 
 if tinystdio
-  if newlib_io_long_double
-    error('tinystdio does not support long double (newlib-io-long-double)')
-  endif
   if newlib_io_float
     error('tinystdio uses a run-time mechanism to select floating point io (newlib-io-float)')
   endif
@@ -378,14 +409,10 @@ else
   if posix_console
     error('newlib stdio does not support the posix-console option (posix-console)')
   endif
-  if newlib_io_long_double and not long_double_equals_double and not long_double_mant_is_64
-    error('newlib-io-long-double not supported on target')
-  endif
 endif
 
 if host_cpu_family == ''
-  host_cmds = cc.cmd_array() + ['-dumpmachine']
-  host_cc_machine=run_command(host_cmds, check : true).stdout().strip().split('-')
+  host_cc_machine=run_command(cc.cmd_array() + ['-dumpmachine'], check : true).stdout().strip().split('-')
   host_cpu_family=host_cc_machine[0]
   message('Computed host_cpu_family as ' + host_cpu_family)
 endif
@@ -410,9 +437,11 @@ endif
 
 tls_model_spec = ''
 thread_local_storage = false
-if get_option('thread-local-storage') == 'auto'
+thread_local_storage_option = get_option('thread-local-storage')
+have_picolibc_tls_api = fs.is_file('newlib/libc/picolib/machine' / host_cpu_family / 'tls.c')
+if thread_local_storage_option == 'auto' or thread_local_storage_option == 'picolibc'
   # We assume that _set_tls() is defined in the arch specific tls.c
-  if fs.is_file('newlib/libc/picolib/machine' / host_cpu_family / 'tls.c')
+  if thread_local_storage_option == 'auto' or have_picolibc_tls_api
     thread_local_storage = not cc.has_function('__emutls_get_address', args: core_c_args + ['-lgcc'])
   endif
 else
@@ -427,13 +456,7 @@ if sysroot_install
   if sysroot != ''
     specs_prefix_format = '%R/@0@'
   else
-    paths = run_command(cc.cmd_array() + ['-print-search-dirs'], check : true).stdout().split('\n')
-    foreach path : paths
-      if path.startswith('install: ')
-	sysroot = path.substring(9) + '../../../..'
-      endif
-    endforeach
-    message('computed sysroot is ' + sysroot)
+    sysroot = cc_install_dir + '../../../..'
     specs_prefix_format = '%:getenv(GCC_EXEC_PREFIX ../../@0@)'
   endif
   if not get_option('sysroot-install-skip-checks')
@@ -466,17 +489,14 @@ endif
 
 specs_dir_option = get_option('specsdir')
 if build_type_subdir != ''
-  specs_install = false
   specs_dir = ''
+  specs_install = false
 elif specs_dir_option == ''
-  search_cmds = cc.cmd_array() + ['-print-search-dirs']
-  install_dir=run_command(search_cmds, check : true).stdout().split('\n')[0]
-  # Meson 0.56 adds a 'substring' method which can be used here
-  specs_dir=run_command(['expr', install_dir, ':', 'install: *\(.*\)'], check : false).stdout().split('\n')[0]
+  specs_dir = cc_install_dir
   specs_install = specs_dir != ''
 elif specs_dir_option == 'none'
-  specs_install = false
   specs_dir = ''
+  specs_install = false
 else
   specs_dir = join_paths(prefix, specs_dir_option)
   specs_install = true
@@ -499,7 +519,7 @@ if specs_extra_list != []
 endif
 
 specs_printf = ''
-if tinystdio
+if tinystdio and printf_aliases
   specs_printf=('%{DPICOLIBC_FLOAT_PRINTF_SCANF:--defsym=vfprintf=__f_vfprintf}' +
 		' %{DPICOLIBC_FLOAT_PRINTF_SCANF:--defsym=vfscanf=__f_vfscanf}' +
 		' %{DPICOLIBC_DOUBLE_PRINTF_SCANF:--defsym=vfprintf=__d_vfprintf}' +
@@ -508,10 +528,12 @@ if tinystdio
 		' %{DPICOLIBC_INTEGER_PRINTF_SCANF:--defsym=vfscanf=__i_vfscanf}')
 endif
 
+crt0_expr = '%{-crt0=*:crt0-%*%O%s; :crt0%O%s}'
+
 if system_libc
   specs_isystem = ''
   specs_libpath = ''
-  specs_startfile = 'crt0%O%s'
+  specs_startfile = crt0_expr
 else
 
 #
@@ -579,7 +601,6 @@ specs_libpath = '-L' + specs_option_format.format(lib_prefix, lib_buildtype, lib
 #
 # Build the non-multilib *startfile options
 #
-crt0_expr = 'crt0%{-crt0=*:-%*%O;:%O}%s'
 
 prefix_crt0_path = '%*/@0@'.format(get_option('libdir')) / crt0_expr
 crt0_prefix = picolibc_prefix_format.format(prefix_crt0_path)
@@ -675,13 +696,49 @@ picolibcpp_specs = configure_file(input: 'picolibc.specs.in',
 				  install_dir: specs_dir,
 				  install: specs_install)
 
+picolibc_linker_type_data = configuration_data()
+if cc.get_linker_id() == 'ld.lld'
+    # ld.lld does not implement ALIGN_WITH_INPUT, but this flag is not needed
+    # with ld.lld's output section LMA/VMA algorithm.
+    # An added ASSERT() statement in the linker script ensures that we don't
+    # get silent failures in case this changes in the future.
+    picolibc_linker_type_data.set('LDSCRIPT_ALIGN_WITH_INPUT', '')
+    if host_cpu_family == 'riscv'
+        # ld.lld before version 15 did not support linker relaxations, disable
+        # them if we are using an older version.
+        # There is no `cc.get_linker_version()` function, so we detect ld.lld
+        # version 15 by checking for a newly added linker flag.
+        if not cc.has_link_argument('--package-metadata=1')
+            message('Linking for RISCV with ld.lld < 15, forcing -mno-relax')
+            c_args += ['-mno-relax']
+        endif
+    endif
+else
+    picolibc_linker_type_data.set('LDSCRIPT_ALIGN_WITH_INPUT', 'ALIGN_WITH_INPUT')
+endif
 
-test_specs = configure_file(input: 'test.specs.in',
-			    output: '@BASENAME@',
-			    configuration: specs_data,
-			    install: false)
+picolibc_linker_type_data.set('DEFAULT_FLASH_ADDR',
+			      meson.get_cross_property('default_flash_addr',
+						       '0x10000000'))
+
+picolibc_linker_type_data.set('DEFAULT_FLASH_SIZE',
+			      meson.get_cross_property('default_flash_size',
+						       '0x00010000'))
+
+picolibc_linker_type_data.set('DEFAULT_RAM_ADDR',
+			      meson.get_cross_property('default_ram_addr',
+						       '0x20000000'))
+
+picolibc_linker_type_data.set('DEFAULT_RAM_SIZE',
+			      meson.get_cross_property('default_ram_size',
+						       '0x00008000'))
+
+picolibc_linker_type_data.set('DEFAULT_STACK_SIZE',
+			      meson.get_cross_property('default_stack_size',
+						       '0x00001000'))
 
 picolibc_ld_data = configuration_data()
+picolibc_ld_data.merge_from(picolibc_linker_type_data)
 picolibc_ld_data.set('CPP_START', '/*')
 picolibc_ld_data.set('CPP_END', '*/')
 picolibc_ld_data.set('C_START', '')
@@ -693,6 +750,7 @@ picolibc_ld = configure_file(input: 'picolibc.ld.in',
 			     install_dir: lib_dir)
 
 picolibcpp_ld_data = configuration_data()
+picolibcpp_ld_data.merge_from(picolibc_linker_type_data)
 picolibcpp_ld_data.set('CPP_START', '')
 picolibcpp_ld_data.set('CPP_END', '')
 picolibcpp_ld_data.set('C_START', '/*')
@@ -704,8 +762,19 @@ picolibcpp_ld = configure_file(input: 'picolibc.ld.in',
 			     install_dir: lib_dir)
 
 # Not all compilers necessarily support all warnings; only use these which are:
-c_warnings = ['-Werror=implicit-function-declaration', '-Werror=vla', '-Warray-bounds', '-Wold-style-definition']
-disabled_warnings = ['-Wno-missing-braces', '-Wno-implicit-int', '-Wno-return-type', '-Wno-unused-command-line-argument']
+c_warnings = [
+  '-Werror=implicit-function-declaration',
+  '-Werror=vla',
+  '-Warray-bounds',
+  '-Wold-style-definition',
+  '-Werror=double-promotion',
+]
+disabled_warnings = [
+  '-Wno-missing-braces',
+  '-Wno-implicit-int',
+  '-Wno-return-type',
+  '-Wno-unused-command-line-argument',
+]
 c_flags = cc.get_supported_arguments(c_warnings, disabled_warnings)
 c_args += c_flags
 native_c_args += c_flags
@@ -725,6 +794,15 @@ volatile size_t aa = 42;
 int main (void) { return overflows(aa, aa); }
 '''
 have_builtin_mul_overflow = cc.links(builtin_mul_overflow_code, name : 'has __builtin_mul_overflow', args: core_c_args)
+
+# CompCert does not have __builtin_add_overflow
+builtin_add_overflow_code = '''
+#include <stddef.h>
+int overflows (size_t a, size_t b) { size_t x; return __builtin_add_overflow(a, b, &x); }
+volatile size_t aa = 42;
+int main (void) { return overflows(aa, aa); }
+'''
+have_builtin_add_overflow = cc.links(builtin_add_overflow_code, name : 'has __builtin_add_overflow', args: core_c_args)
 
 # CompCert does not support _Complex
 complex_code = '''
@@ -765,7 +843,7 @@ if enable_multilib
   # Ask the compiler for the set of available multilib configurations,
   # set up the build system to compile for all desired ones
 
-  target_list = run_command(cc, '--print-multi-lib', check : true).stdout().strip().split('\n')
+  target_list = run_command(cc.cmd_array() +  ['--print-multi-lib'], check : true).stdout().strip().split('\n')
 
   has_mcmodel = false
   foreach target : target_list
@@ -786,7 +864,29 @@ if enable_multilib
       if tmp.length() > 1
 	foreach flag : tmp[1].strip('@').split('@')
 	  if flag != ''
-	    flags += '-' + flag
+	    if host_cpu_family == 'nios2'
+	      # Hacks for NIOS II to get rid of -fsingle-precision-constant
+	      # mode (which breaks libm). We don't need fph2 as that
+	      # doesn't set the single precision constant flag
+	      if flag == 'mcustom-fpu-cfg=60-1'
+		flags += ['-mcustom-fmuls=252', '-mcustom-fadds=253',
+			  '-mcustom-fsubs=254']
+	      elif flag == 'mcustom-fpu-cfg=60-2'
+		flags += ['-mcustom-fmuls=252', '-mcustom-fadds=253',
+			  '-mcustom-fsubs=254', '-mcustom-fdivs=255']
+	      elif flag == 'mcustom-fpu-cfg=72-3'
+		flags += ['-mcustom-floatus=243', '-mcustom-fixsi=244',
+			  '-mcustom-floatis=245','-mcustom-fcmpgts=246',
+			  '-mcustom-fcmples=249', '-mcustom-fcmpeqs=250',
+			  '-mcustom-fcmpnes=251', '-mcustom-fmuls=252',
+			  '-mcustom-fadds=253', '-mcustom-fsubs=254',
+			  '-mcustom-fdivs=255']
+	      else
+		flags += '-' + flag
+	      endif
+	    else
+	      flags += '-' + flag
+	    endif
 	  endif
 	endforeach
 	if tmp[0] == '.'
@@ -884,7 +984,11 @@ conf_data.set('_HAVE_NO_BUILTIN_ATTRIBUTE',
 
 conf_data.set('_HAVE_LONG_DOUBLE', have_long_double,
 	      description: 'Compiler has long double type')
-if have_long_double
+if set_double_equals_float
+  conf_data.set('_DBL_EQ_FLT', double_equals_float,
+		description: 'double is the same as float')
+endif
+if set_long_double_equals_double
   conf_data.set('_LDBL_EQ_DBL', long_double_equals_double,
 		description: 'long double is the same as double')
 endif
@@ -896,8 +1000,9 @@ conf_data.set('_WANT_IO_LONG_LONG', io_long_long)
 conf_data.set('_WANT_IO_POS_ARGS', io_pos_args)
 conf_data.set('_WANT_IO_C99_FORMATS', io_c99_formats)
 conf_data.set('_IO_FLOAT_EXACT', io_float_exact)
+conf_data.set('_WANT_IO_PERCENT_B', io_percent_b)
+conf_data.set('_WANT_IO_LONG_DOUBLE', io_long_double)
 if not tinystdio
-  conf_data.set('_WANT_IO_LONG_DOUBLE', newlib_io_long_double)
   conf_data.set('NO_FLOATING_POINT', not newlib_io_float)
   conf_data.set('FLOATING_POINT', newlib_io_float)
   conf_data.set('_WANT_REENT_GLOBAL_STDIO_STREAMS', newlib_global_stdio_streams)
@@ -921,6 +1026,7 @@ conf_data.set('_HAVE_FCNTL', newlib_have_fcntl)
 conf_data.set('_NANO_MALLOC', newlib_nano_malloc)
 conf_data.set('_UNBUF_STREAM_OPT', get_option('newlib-unbuf-stream-opt'))
 conf_data.set('_LITE_EXIT', lite_exit)
+conf_data.set('_PICO_EXIT', picoexit)
 conf_data.set('_NANO_FORMATTED_IO', newlib_nano_formatted_io)
 conf_data.set('_RETARGETABLE_LOCKING', get_option('newlib-retargetable-locking'))
 conf_data.set('TINY_STDIO', tinystdio, description: 'Use tiny stdio from gcc avr')
@@ -935,11 +1041,13 @@ conf_data.set('_HAVE_INITFINI_ARRAY', get_option('newlib-initfini-array'), descr
 conf_data.set('_HAVE_INIT_FINI', get_option('newlib-initfini'), description: 'Support _init() and _fini() functions')
 conf_data.set('NEWLIB_TLS', thread_local_storage, description: 'use thread local storage')
 conf_data.set('PICOLIBC_TLS', thread_local_storage, description: 'use thread local storage')
-conf_data.set('_HAVE_PICOLIBC_TLS_API', thread_local_storage, description: '_set_tls and _init_tls functions available')
+conf_data.set('_HAVE_PICOLIBC_TLS_API', thread_local_storage and have_picolibc_tls_api, description: '_set_tls and _init_tls functions available')
 conf_data.set('POSIX_IO', posix_io, description: 'Use open/close/read/write in tinystdio')
 conf_data.set('ATOMIC_UNGETC', atomic_ungetc, description: 'Use atomics for fgetc/ungetc for re-entrancy')
+conf_data.set('_PICOLIBC_ATOMIC_SIGNAL', get_option('atomic-signal'), description: 'Use atomics for signal/raise for re-entrancy')
 conf_data.set('_HAVE_BITFIELDS_IN_PACKED_STRUCTS', have_bitfields_in_packed_structs, description: 'Use bitfields in packed structs')
 conf_data.set('_HAVE_BUILTIN_MUL_OVERFLOW', have_builtin_mul_overflow, description: 'Compiler has __builtin_mul_overflow')
+conf_data.set('_HAVE_BUILTIN_ADD_OVERFLOW', have_builtin_add_overflow, description: 'Compiler has __builtin_add_overflow')
 conf_data.set('_HAVE_COMPLEX', have_complex, description: 'Compiler supports _Complex')
 conf_data.set('_HAVE_BUILTIN_EXPECT', have_builtin_expect, description: 'Compiler has __builtin_expect')
 conf_data.set('_HAVE_ALLOC_SIZE', have_alloc_size, description: 'The compiler REALLY has the attribute __alloc_size__')
@@ -968,7 +1076,14 @@ int main(void) {
       break
     endif
   endforeach
+elif errno_function == 'zephyr'
+  if thread_local_storage
+    errno_function = 'false'
+  else
+    errno_function = 'z_errno_wrap'
+  endif
 endif
+
 if errno_function != 'false'
   conf_data.set('__PICOLIBC_ERRNO_FUNCTION', errno_function)
 endif
@@ -1018,7 +1133,23 @@ endif
 # Dig out the list of available encodings from the encoding.aliases file. Only
 # accept the first entry from each line
 
-available_encodings = run_command(['sed', '-e', '/^#/d', '-e', '/^$/d', '-e', 's/ .*$//', files('newlib/libc/iconv/encoding.aliases')[0]], check : true).stdout().split('\n')
+available_encodings = []
+# fs.read was added in meson version 0.57.0. The sed invocation can be
+# removed once picolibc requires a version of meson newer than that.
+if meson.version().version_compare('>=0.57')
+  foreach line : fs.read('newlib/libc/iconv/encoding.aliases').split('\n')
+    if line != '' and not line.startswith('#')
+      available_encodings += [line.split()[0]]
+    endif
+  endforeach
+else
+  _available_encodings = run_command(['sed', '-e', '/^#/d', '-e', '/^$/d', '-e', 's/ .*$//', files('newlib/libc/iconv/encoding.aliases')[0]], check : true).stdout().split('\n')
+  foreach _encoding : _available_encodings
+    if _encoding != ''
+      available_encodings += _encoding
+    endif
+  endforeach
+endif
 
 # Include all available encodings if none were specified on the command line
 
@@ -1040,6 +1171,7 @@ endif
 # Set config variables for each requested 'from' encoding
 
 foreach from : newlib_iconv_from_encodings
+  message('from ' + from)
   if not available_encodings.contains(from)
     error('Requested from encoding ' + from + ' is not available. Look in newlib/libc/iconv/encoding.aliases')
   endif
@@ -1139,8 +1271,8 @@ conf_data.set('_HAVE_SEMIHOST', has_semihost, description: 'Semihost APIs suppor
 
 # By default, tests don't require any special arguments
 
-# disable compiler built-ins so we reach the library equivalents
-test_c_args = c_args + arg_fnobuiltin
+test_c_args = c_args
+# disable compiler built-ins so we don't use native equivalents
 native_c_args += arg_fnobuiltin
 if tests_enable_stack_protector
   if cc.has_argument('-fstack-protector-all') and cc.has_argument('-fstack-protector-strong')
@@ -1162,7 +1294,7 @@ endif
 # of meson newer than that.
 
 test_env = environment({'PICOLIBC_TEST' : '1'})
-test_env.prepend('PATH', meson.source_root() / 'scripts')
+test_env.prepend('PATH', meson.current_source_dir() / 'scripts')
 
 # CompCert needs the '-WUl,' prefix to correctly pass the --spec parameters to the linker
 specs_prefix = ''
@@ -1171,28 +1303,17 @@ if cc.get_id() == 'ccomp'
 endif
 
 if has_semihost
-  # If we're using semihosting, we assume that there's a custom linker
-  # script that includes picolibc.specs.  Linker args must be strings
-  # (seems like a bug), so compute the path by hand.  Because at the
-  # linker's runtime, its working directory is the build dir, linker
-  # scripts under scripts/ can't be found. We use the absolute path
-  # for our convinience.
-  cpu_script = 'scripts' / 'test-' + host_machine.cpu() + '.ld'
-  cpu_family_script = 'scripts' / 'test-' + host_cpu_family + '.ld'
-  if fs.is_file(cpu_script)
-    custom_script = cpu_script
-  else
-    custom_script = cpu_family_script
-  endif
-  test_link_args = ['-nostartfiles',
-                    '-T', meson.current_source_dir() / custom_script,
-                    '-T', '@0@'.format(picolibc_ld), '-lgcc'] + additional_libs_list
-  test_linker_files = files(custom_script) + [picolibc_ld]
+  test_link_args = ['-nostartfiles', '-T', '@0@'.format(picolibc_ld),
+		    '-lgcc'] + additional_libs_list
+  test_linker_files = [picolibc_ld]
   specs = picolibc_specs
 else
+  specs = configure_file(input: 'test.specs.in',
+			 output: '@BASENAME@',
+			 configuration: specs_data,
+			 install: false)
   test_link_args = []
   test_linker_files = []
-  specs = test_specs
 endif
 
 # Clang does not support spec files
@@ -1227,5 +1348,5 @@ configure_file(output : 'picolibc.h',
 # provide a dependency to be used by the main project:
 #   dependency('libc', fallback: ['picolibc', 'libc_dep'])
 if not enable_multilib and meson.is_subproject()
-  picolibc_dep = declare_dependency(include_directories: inc, link_with: [lib_c, lib_m])
+  picolibc_dep = declare_dependency(include_directories: inc, link_with: [lib_c])
 endif

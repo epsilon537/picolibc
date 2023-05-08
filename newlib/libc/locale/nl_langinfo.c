@@ -204,7 +204,9 @@ char *nl_langinfo_l (nl_item item, struct __locale_t *locale)
 #ifdef _MB_CAPABLE
 		ret = (char *) __locale_charset (locale);
 #endif
+#ifdef __HAVE_LOCALE_INFO__
 do_codeset:
+#endif
 #ifdef __CYGWIN__
 		/* Convert charset to Linux compatible codeset string. */
 		if (ret[0] == 'A'/*SCII*/)
@@ -230,6 +232,8 @@ do_codeset:
 		      ret = "GEORGIAN-PS";
 		    else if (strcmp (ret + 2, "102") == 0)
 		      ret = "PT154";
+		    else if (strcmp (ret + 2, "103") == 0)
+		      ret = "KOI8-T";
 		  }
 		else if (ret[0] == 'S'/*JIS*/)
 		  {

@@ -35,7 +35,7 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
-project(Picolibc VERSION 1.7.6 LANGUAGES C ASM)
+project(Picolibc VERSION 1.8.1 LANGUAGES C ASM)
 
 if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm64")
   set(CMAKE_SYSTEM_PROCESSOR "aarch64")
@@ -119,80 +119,88 @@ set(_FSEEK_OPTIMIZATION 0)
 
 set(_FVWRITE_IN_STREAMIO 0)
 
-try_compile(_HAVE_ALIAS_ATTRIBUTE ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/have-alias-attribute.c)
+# Compiler supports alias symbol attribute
+picolibc_flag(_HAVE_ALIAS_ATTRIBUTE)
 
 # The compiler REALLY has the attribute __alloc_size__
-try_compile(_HAVE_ALLOC_SIZE ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/have-alloc-size.c)
+picolibc_flag(_HAVE_ALLOC_SIZE)
 
 # The compiler supports the always_inline function attribute
-try_compile(_HAVE_ATTRIBUTE_ALWAYS_INLINE ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/have-attribute-always-inline.c)
+picolibc_flag(_HAVE_ATTRIBUTE_ALWAYS_INLINE)
 
 # The compiler supports the gnu_inline function attribute
-try_compile(_HAVE_ATTRIBUTE_GNU_INLINE  ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/have-attribute-gnu-inline.c)
+picolibc_flag(_HAVE_ATTRIBUTE_GNU_INLINE)
 
 # Use bitfields in packed structs
-set(_HAVE_BITFIELDS_IN_PACKED_STRUCTS 1)
+picolibc_flag(_HAVE_BITFIELDS_IN_PACKED_STRUCTS)
 
 # The compiler supports __builtin_alloca
-set(_HAVE_BUILTIN_ALLOCA 1)
+picolibc_flag(_HAVE_BUILTIN_ALLOCA)
 
 # The compiler supports __builtin_copysign
-set(_HAVE_BUILTIN_COPYSIGN 1)
+picolibc_flag(_HAVE_BUILTIN_COPYSIGN)
 
 # The compiler supports __builtin_copysignl
-set(_HAVE_BUILTIN_COPYSIGNL 1)
+picolibc_flag(_HAVE_BUILTIN_COPYSIGNL)
 
 # The compiler supports __builtin_ctz
-set(_HAVE_BUILTIN_CTZ 1)
+picolibc_flag(_HAVE_BUILTIN_CTZ)
 
 # The compiler supports __builtin_ctzl
-set(_HAVE_BUILTIN_CTZL 1)
+picolibc_flag(_HAVE_BUILTIN_CTZL)
 
 # The compiler supports __builtin_ctzll
-set(_HAVE_BUILTIN_CTZLL 1)
+picolibc_flag(_HAVE_BUILTIN_CTZLL)
 
 # Compiler has __builtin_expect
-set(_HAVE_BUILTIN_EXPECT 1)
+picolibc_flag(_HAVE_BUILTIN_EXPECT)
 
 # The compiler supports __builtin_ffs
-set(_HAVE_BUILTIN_FFS 1)
+picolibc_flag(_HAVE_BUILTIN_FFS)
 
 # The compiler supports __builtin_ffsl
-set(_HAVE_BUILTIN_FFSL 1)
+picolibc_flag(_HAVE_BUILTIN_FFSL)
 
 # The compiler supports __builtin_ffsll
-set(_HAVE_BUILTIN_FFSLL 1)
+picolibc_flag(_HAVE_BUILTIN_FFSLL)
 
 # The compiler supports __builtin_finitel
-set(_HAVE_BUILTIN_FINITEL 1)
+picolibc_flag(_HAVE_BUILTIN_FINITEL)
 
 # The compiler supports __builtin_isfinite
-set(_HAVE_BUILTIN_ISFINITE 1)
+picolibc_flag(_HAVE_BUILTIN_ISFINITE)
 
 # The compiler supports __builtin_isinf
-set(_HAVE_BUILTIN_ISINF 1)
+picolibc_flag(_HAVE_BUILTIN_ISINF)
 
 # The compiler supports __builtin_isinfl
-set(_HAVE_BUILTIN_ISINFL 1)
+picolibc_flag(_HAVE_BUILTIN_ISINFL)
 
 # The compiler supports __builtin_isnan
-set(_HAVE_BUILTIN_ISNAN 1)
+picolibc_flag(_HAVE_BUILTIN_ISNAN)
 
 # The compiler supports __builtin_isnanl
-set(_HAVE_BUILTIN_ISNANL 1)
+picolibc_flag(_HAVE_BUILTIN_ISNANL)
 
 # Compiler has __builtin_mul_overflow
-set(_HAVE_BUILTIN_MUL_OVERFLOW 1)
+picolibc_flag(_HAVE_BUILTIN_MUL_OVERFLOW)
 
-# Compiler flag to prevent detecting memcpy/memset patterns
-set(_HAVE_CC_INHIBIT_LOOP_TO_LIBCALL 1)
+# Compiler has __builtin_add_overflow
+picolibc_flag(_HAVE_BUILTIN_ADD_OVERFLOW)
+
+# Compiler has support for flag to prevent mis-optimizing memcpy/memset patterns
+picolibc_flag(_HAVE_CC_INHIBIT_LOOP_TO_LIBCALL)
 
 # Compiler supports _Complex
-set(_HAVE_COMPLEX 1)
+picolibc_flag(_HAVE_COMPLEX)
+
+# Compiler supports format function attribute
+picolibc_flag(_HAVE_FORMAT_ATTRIBUTE 1)
+
+# Compiler supports weak attribute
+picolibc_flag(_HAVE_WEAK_ATTRIBUTE)
 
 set(_HAVE_FCNTL 0)
-
-set(_HAVE_FORMAT_ATTRIBUTE 1)
 
 # IEEE fp funcs available
 set(_HAVE_IEEEFP_FUNCS 0)
@@ -204,18 +212,17 @@ set(_HAVE_INITFINI_ARRAY 1)
 set(_HAVE_INIT_FINI 1)
 
 # Compiler has long double type
-try_compile(_HAVE_LONG_DOUBLE ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/have-long-double.c)
+picolibc_flag(_HAVE_LONG_DOUBLE)
 
 # Compiler attribute to prevent the optimizer from adding new builtin calls
-set(_HAVE_NO_BUILTIN_ATTRIBUTE 0)
+picolibc_flag(_HAVE_NO_BUILTIN_ATTRIBUTE)
 
 # _set_tls and _init_tls functions available
-if(NOT DEFINED _HAVE_PICOLIBC_TLS_API)
+if(NOT DEFINED _HAVE_PICOLIBC_TLS_API OR NOT PICOLIBC_TLS)
   set(_HAVE_PICOLIBC_TLS_API 0)
 endif()
 
 set(_HAVE_SEMIHOST 1)
-set(_HAVE_WEAK_ATTRIBUTE 1)
 set(_ICONV_ENABLE_EXTERNAL_CCS 0)
 set(_ICONV_FROM_ENCODING_ 1)
 set(_ICONV_FROM_ENCODING_BIG5 1)
@@ -327,10 +334,9 @@ if(NOT DEFINED _IO_FLOAT_EXACT)
   option(_IO_FLOAT_EXACT "Provide exact binary/decimal conversion for printf/scanf" 1)
 endif()
 
-# is long double the same as double
-try_compile(_LDBL_EQ_DBL ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ldbl-eq-dbl.c)
-
 set(_LITE_EXIT 1)
+
+set(_PICO_EXIT 1)
 
 if(NOT DEFINED _MB_CAPABLE)
   option(_MB_CAPABLE "Enable multi-byte support" 0)
@@ -359,6 +365,10 @@ if(NOT DEFINED _WANT_IO_POS_ARGS)
 endif()
 
 option(__IO_FLOAT "Support floating point in printf/scanf by default" OFF)
+
+if(NOT DEFINED _WANT_IO_PERCENT_B)
+  option(_WANT_IO_PERCENT_B "Support %b/%B formats in printf/scanf" OFF)
+endif()
 
 if(NOT DEFINED FORMAT_DEFAULT_DOUBLE)
   set(FORMAT_DEFAULT_DOUBLE ${__IO_FLOAT})
@@ -407,7 +417,11 @@ if(NOT DEFINED __SINGLE_THREAD__)
   option(__SINGLE_THREAD__ "Disable multithreading support" 0)
 endif()
 
-set(_RETARGETABLE_LOCKING NOT ${__SINGLE_THREAD__})
+if(__SINGLE_THREAD__)
+  set(_RETARGETABLE_LOCKING 0)
+else()
+  set(_RETARGETABLE_LOCKING 1)
+endif()
 
 set(NEWLIB_VERSION 4.3.0)
 set(NEWLIB_MAJOR 4)
@@ -418,11 +432,17 @@ set(PICOLIBC_INCLUDE ${PROJECT_BINARY_DIR}/picolibc/include)
 
 set(PICOLIBC_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 
+include(CheckIncludeFile)
+
+CHECK_INCLUDE_FILE(xtensa/config/core-isa.h _XTENSA_HAVE_CONFIG_CORE_ISA_H)
+
 configure_file(picolibc.h.in "${PICOLIBC_INCLUDE}/picolibc.h")
 
 set(INCLUDEDIR include)
 set(LIBDIR .)
-set(TLSMODEL "-ftls-model=${TLS_MODEL}")
+if(PICOLIBC_TLS)
+  set(TLSMODEL "-ftls-model=${TLS_MODEL}")
+endif()
 set(LINK_SPEC "")
 set(CC1_SPEC "")
 set(CC1PLUS_SPEC "")
@@ -443,9 +463,24 @@ configure_file(picolibc.specs.in "${PROJECT_BINARY_DIR}/picolibc.specs" @ONLY)
 set(PICOLIBC_COMPILE_OPTIONS
   "--include" "${PICOLIBC_INCLUDE}/picolibc.h"
   "-nostdlib"
+  "-D_LIBC"
+  ${TLSMODEL}
+  ${TARGET_COMPILE_OPTIONS}
+  ${PICOLIBC_EXTRA_COMPILE_OPTIONS}
+  ${PICOLIBC_MATH_FLAGS}
+  )
+
+# Strip out any generator expressions as those cannot be used with
+# try_compile
+
+foreach(c_option "${PICOLIBC_COMPILE_OPTIONS}")
+  if(NOT "${c_option}" MATCHES "\\$")
+    list(APPEND PICOLIBC_TEST_COMPILE_OPTIONS "${c_option}")
+  endif()
+endforeach()
+
+picolibc_supported_compile_options(
   "-fno-common"
-  "-frounding-math"
-  "-fsignaling-nans"
   "-fno-stack-protector"
   "-ffunction-sections"
   "-fdata-sections"
@@ -455,9 +490,8 @@ set(PICOLIBC_COMPILE_OPTIONS
   "-Werror=vla"
   "-Warray-bounds"
   "-Wold-style-definition"
-  ${TLSMODEL}
-  ${TARGET_COMPILE_OPTIONS}
-  ${PICOLIBC_EXTRA_COMPILE_OPTIONS}
+  "-frounding-math"
+  "-fsignaling-nans"
   )
 
 add_library(c STATIC)
@@ -495,7 +529,6 @@ if(TESTS)
   # linker group
 
   set(PICOLIBC_TEST_LINK_LIBRARIES
-    ${PICOLIBC_COMPILE_OPTIONS}
     ${PICOCRT_SEMIHOST_OBJ}
     -Wl,--start-group c semihost -Wl,--end-group
     ${PICOLIBC_LINK_FLAGS}

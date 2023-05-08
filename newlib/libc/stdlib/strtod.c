@@ -269,6 +269,8 @@ strtod_l (const char *__restrict s00, char **__restrict se,
 #else
 	const char *decimal_point = ".";
 	const int dec_len = 1;
+
+        (void) loc;
 #endif
 
 	delta = bs = bd = NULL;
@@ -1315,6 +1317,20 @@ isdenormf(float f)
     union { float f; __uint32_t i; } u;
     u.f = f;
     return (u.i & 0x7f800000) == 0;
+}
+
+float
+strtof_l (const char *__restrict s00, char **__restrict se, locale_t loc)
+{
+  double val = strtod_l (s00, se, loc);
+  if (isnan (val))
+    return signbit (val) ? -nanf ("") : nanf ("");
+  float retval = (float) val;
+#ifndef NO_ERRNO
+  if ((isinf (retval) && !isinf (val)) || (isdenormf(retval) && !isdenorm(val)))
+    _REENT_ERRNO(_REENT) = ERANGE;
+#endif
+  return retval;
 }
 
 float

@@ -31,6 +31,7 @@
 #define	_FSTDIO			/* ``function stdio'' */
 
 #define __need_size_t
+#define __need_ssize_t
 #define __need_NULL
 #include <sys/cdefs.h>
 #include <stddef.h>
@@ -92,11 +93,11 @@ struct __sFILE {
   /* operations */
   void *	_cookie;	/* cookie passed to io functions */
 
-  _READ_WRITE_RETURN_TYPE (*_read) (void *,
-					   char *, _READ_WRITE_BUFSIZE_TYPE);
-  _READ_WRITE_RETURN_TYPE (*_write) (void *,
+  _ssize_t (*_read) (void *,
+					   char *, size_t);
+  _ssize_t (*_write) (void *,
 					    const char *,
-					    _READ_WRITE_BUFSIZE_TYPE);
+					    size_t);
   _fpos_t (*_seek) (void *, _fpos_t, int);
   int (*_close) (void *);
 
@@ -142,11 +143,11 @@ struct __sFILE64 {
   /* operations */
   void *	_cookie;	/* cookie passed to io functions */
 
-  _READ_WRITE_RETURN_TYPE (*_read) (void *,
-					   char *, _READ_WRITE_BUFSIZE_TYPE);
-  _READ_WRITE_RETURN_TYPE (*_write) (void *,
+  _ssize_t (*_read) (void *,
+					   char *, size_t);
+  _ssize_t (*_write) (void *,
 					    const char *,
-					    _READ_WRITE_BUFSIZE_TYPE);
+					    size_t);
   _fpos_t (*_seek) (void *, _fpos_t, int);
   int (*_close) (void *);
 
@@ -336,6 +337,7 @@ char *	cuserid (char *);
 FILE *	tmpfile (void);
 char *	tmpnam (char *);
 #if __BSD_VISIBLE || __XSI_VISIBLE || __POSIX_VISIBLE >= 200112
+void	free (void *) _NOTHROW;
 char *	tempnam (const char *, const char *) __malloc_like __result_use_check;
 #endif
 int	fclose (FILE *);
@@ -594,39 +596,37 @@ int	_swbuf ( int, FILE *);
 # ifdef __LARGE64_FILES
 FILE	*funopen (const void *__cookie,
 		int (*__readfn)(void *__c, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
+				size_t __n),
 		int (*__writefn)(void *__c, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
+				 size_t __n),
 		_fpos64_t (*__seekfn)(void *__c, _fpos64_t __off, int __whence),
 		int (*__closefn)(void *__c));
 FILE	*funopen ( const void *__cookie,
 		int (*__readfn)(void *__c, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
+				size_t __n),
 		int (*__writefn)(void *__c, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
+				 size_t __n),
 		_fpos64_t (*__seekfn)(void *__c, _fpos64_t __off, int __whence),
 		int (*__closefn)(void *__c));
 # else
 FILE	*funopen (const void *__cookie,
 		int (*__readfn)(void *__cookie, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
+				size_t __n),
 		int (*__writefn)(void *__cookie, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
+				 size_t __n),
 		fpos_t (*__seekfn)(void *__cookie, fpos_t __off, int __whence),
 		int (*__closefn)(void *__cookie));
 FILE	*funopen ( const void *__cookie,
 		int (*__readfn)(void *__cookie, char *__buf,
-				_READ_WRITE_BUFSIZE_TYPE __n),
+				size_t __n),
 		int (*__writefn)(void *__cookie, const char *__buf,
-				 _READ_WRITE_BUFSIZE_TYPE __n),
+				 size_t __n),
 		fpos_t (*__seekfn)(void *__cookie, fpos_t __off, int __whence),
 		int (*__closefn)(void *__cookie));
 # endif /* !__LARGE64_FILES */
 
-# define	fropen(__cookie, __fn) funopen(__cookie, __fn, (int (*)())0, \
-					       (fpos_t (*)())0, (int (*)())0)
-# define	fwopen(__cookie, __fn) funopen(__cookie, (int (*)())0, __fn, \
-					       (fpos_t (*)())0, (int (*)())0)
+# define	fropen(__cookie, __fn) funopen(__cookie, __fn, NULL, NULL, NULL)
+# define	fwopen(__cookie, __fn) funopen(__cookie, NULL, __fn, NULL, NULL)
 #endif /* __BSD_VISIBLE */
 
 #if __GNU_VISIBLE
