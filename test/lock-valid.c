@@ -50,33 +50,42 @@ intptr_t __lock___libc_recursive_mutex;
 #define MAX_LOCKS 32
 
 static intptr_t locks[MAX_LOCKS];
-static int lock_id;
+static uint8_t in_use[MAX_LOCKS];
 
 /* Create a new dynamic non-recursive lock */
 void __retarget_lock_init(_LOCK_T *lock)
 {
-        assert(lock_id < MAX_LOCKS);
-        *lock = &locks[lock_id++];
-        **lock = 0;
+        int lock_id = 0;
+
+        for (lock_id = 0; lock_id < MAX_LOCKS; lock_id++)
+                if (!in_use[lock_id]) {
+                        in_use[lock_id] = 1;
+                        *lock = &locks[lock_id];
+                        **lock = 0;
+                        return;
+                }
+        assert(0);
 }
 
 /* Create a new dynamic recursive lock */
 void __retarget_lock_init_recursive(_LOCK_T *lock)
 {
-        *lock = &locks[lock_id++];
-        **lock = 0;
+        __retarget_lock_init(lock);
 }
 
 /* Close dynamic non-recursive lock */
 void __retarget_lock_close(_LOCK_T lock)
 {
         assert(*lock == 0);
+        int lock_id = lock - locks;
+        assert(0 <= lock_id && lock_id < MAX_LOCKS);
+        in_use[lock_id] = 0;
 }
 
 /* Close dynamic recursive lock */
 void __retarget_lock_close_recursive(_LOCK_T lock)
 {
-        assert(*lock == 0);
+        __retarget_lock_close(lock);
 }
 
 /* Acquiure non-recursive lock */
@@ -88,20 +97,6 @@ void __retarget_lock_acquire(_LOCK_T lock)
 
 /* Acquiure recursive lock */
 void __retarget_lock_acquire_recursive(_LOCK_T lock)
-{
-        assert(*lock >= 0);
-        ++(*lock);
-}
-
-/* Try acquiring non-recursive lock */
-int __retarget_lock_try_acquire(_LOCK_T lock)
-{
-        assert(*lock == 0);
-        *lock = 1;
-}
-
-/* Try acquiring recursive lock */
-int __retarget_lock_try_acquire_recursive(_LOCK_T lock)
 {
         assert(*lock >= 0);
         ++(*lock);
@@ -121,28 +116,13 @@ void __retarget_lock_release_recursive(_LOCK_T lock)
         --(*lock);
 }
 
-#ifdef _PICO_EXIT
-#define LIBC_LOCK_EXIT_COUNT 0
-#else
-/*
- * Legacy onexit handler holds libc lock while calling hooks
- */
-#define LIBC_LOCK_EXIT_COUNT 1
-#endif
-
-static void lock_validate(int ret, void *arg)
+__attribute__((destructor))
+static void lock_validate(void)
 {
         int i;
-        (void) ret;
-        (void) arg;
-        for (i = 0; i < MAX_LOCKS; i++)
+        for (i = 0; i < MAX_LOCKS; i++) {
                 assert(locks[i] == 0);
+        }
 
-        assert(__lock___libc_recursive_mutex == LIBC_LOCK_EXIT_COUNT);
-}
-
-__attribute__((constructor))
-static void add_lock_validate(void)
-{
-    on_exit(lock_validate, NULL);
+        assert(__lock___libc_recursive_mutex == 0);
 }

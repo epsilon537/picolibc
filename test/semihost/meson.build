@@ -70,7 +70,11 @@ semihost_fail_tests = [
   'semihost-system-failure',
 ]
 
-command_line = 'hello world'
+semihost_no_args_tests = [
+  'semihost-no-argv',
+]
+
+test_args = ['hello', 'world']
 
 foreach target : targets
   value = get_variable('target_' + target)
@@ -85,9 +89,9 @@ foreach target : targets
     _objs = []
   endif
   
-  _c_args = value[1] + test_c_args + ['-DCOMMAND_LINE="' + command_line + '"']
-
-  _link_args = value[1] + test_link_args
+  _c_args = value[1] + get_variable('test_c_args_' + target, test_c_args)
+  _link_args = value[1] + get_variable('test_link_args_' + target, test_link_args)
+  _link_depends = get_variable('test_link_depends_' + target, test_link_depends)
 
   foreach semihost_test : semihost_tests
     semihost_test_src = semihost_test + '.c'
@@ -97,16 +101,19 @@ foreach target : targets
       semihost_test_name = semihost_test + '_' + target
     endif
 
+    _cmd_arg = ['-DCOMMAND_LINE="' + 'program-name' + ' ' + ' '.join(test_args) + '"']
+
     test(semihost_test_name,
 	 executable(semihost_test_name, [semihost_test_src],
-		    c_args: _c_args,
+		    c_args: _c_args + _cmd_arg,
 		    link_args: double_printf_link_args + _link_args,
 		    objects: _objs,
 		    link_with: _libs,
-		    link_depends:  test_link_depends,
+		    link_depends:  _link_depends,
 		    include_directories: inc),
-	 args: ['--', command_line],
+	 args: test_args,
          depends: bios_bin,
+         suite: 'semihost',
 	 env: test_env)
   endforeach
 
@@ -120,15 +127,40 @@ foreach target : targets
 
     test(semihost_fail_test_name,
 	 executable(semihost_fail_test_name, [semihost_fail_test_src],
-		    c_args: _c_args,
+		    c_args: _c_args + _cmd_arg,
 		    link_args: _link_args,
 		    objects: _objs,
 		    link_with: _libs,
-		    link_depends:  test_link_depends,
+		    link_depends:  _link_depends,
 		    include_directories: inc),
-	 args: ['--', command_line],
+	 args: test_args,
+         depends: bios_bin,
+         suite: 'semihost',
 	 env: test_env,
 	 should_fail: true)
   endforeach
   
+  if has_semihost_args
+    foreach semihost_test : semihost_no_args_tests
+      semihost_test_src = semihost_test + '.c'
+      if target == ''
+	semihost_test_name = semihost_test
+      else
+	semihost_test_name = semihost_test + '_' + target
+      endif
+
+      test(semihost_test_name,
+	   executable(semihost_test_name, [semihost_test_src],
+		      c_args: _c_args + _cmd_arg,
+		      link_args: double_printf_link_args + _link_args,
+		      objects: _objs,
+		      link_with: _libs,
+		      link_depends:  test_link_depends,
+		      include_directories: inc),
+           depends: bios_bin,
+           suite: 'semihost',
+	   env: test_env)
+    endforeach
+  endif
+
 endforeach

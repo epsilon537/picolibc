@@ -292,11 +292,12 @@ strptime_l (const char *buf, const char *format, struct tm *timeptr,
 		ret = match_string (&buf, _ctloc (am_pm), locale);
 		if (ret < 0)
 		    return NULL;
-		if (timeptr->tm_hour == 0) {
-		    if (ret == 1)
-			timeptr->tm_hour = 12;
-		} else
-		    timeptr->tm_hour += 12;
+		if (timeptr->tm_hour > 12)
+		    return NULL;
+		else if (timeptr->tm_hour == 12)
+		    timeptr->tm_hour = ret * 12;
+		else
+		    timeptr->tm_hour += ret * 12;
 		break;
 	    case 'q' :		/* quarter year - GNU extension */
 		ret = strtol_l (buf, &s, 10, locale);
@@ -434,7 +435,7 @@ strptime_l (const char *buf, const char *format, struct tm *timeptr,
 		break;
 	    case '\0' :
 		--format;
-		FALLTHROUGH;
+		__PICOLIBC_FALLTHROUGH;
 	    case '%' :
 		if (*buf == '%')
 		    ++buf;

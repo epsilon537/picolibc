@@ -55,7 +55,10 @@ _start(void)
 {
 	/* Generate a reference to __interrupt_vector so we get one loaded */
 	__asm__(".equ __my_interrupt_vector, __interrupt_vector");
-#ifndef __SOFTFP__
+    /* Access to the coprocessor has to be enabled in CPACR, if either FPU or
+     * MVE is used. This is described in "Arm v8-M Architecture Reference
+     * Manual". */
+#if defined __ARM_FP || defined __ARM_FEATURE_MVE
 	/* Enable FPU */
 	*CPACR |= 0xf << 20;
 	/*
@@ -73,6 +76,18 @@ _start(void)
 #define INIT_FPSCR 0x0
 #endif
 	__asm__("vmsr fpscr, %0" : : "r" (INIT_FPSCR));
+#endif
+
+#if defined(__ARM_FEATURE_PAUTH) || defined(__ARM_FEATURE_BTI)
+        uint32_t        control;
+        __asm__("mrs %0, CONTROL" : "=r" (control));
+#ifdef __ARM_FEATURE_PAUTH
+        control |= (3 << 6);
+#endif
+#ifdef __ARM_FEATURE_BTI
+        control |= (3 << 4);
+#endif
+        __asm__("msr CONTROL, %0" : : "r" (control));
 #endif
 	__start();
 }
@@ -101,20 +116,20 @@ _start(void)
 	/* Initialize stack pointer */
 	__asm__("mov sp, %0" : : "r" (__stack));
 
-#if __ARM_ARCH == 7
-#ifdef __thumb__
+#ifdef __thumb2__
 	/* Make exceptions run in Thumb mode */
 	uint32_t sctlr;
 	__asm__("mrc p15, 0, %0, c1, c0, 0" : "=r" (sctlr));
 	sctlr |= (1 << 30);
 	__asm__("mcr p15, 0, %0, c1, c0, 0" : : "r" (sctlr));
 #endif
-#ifndef __SOFTFP__
+#if defined __ARM_FP || defined __ARM_FEATURE_MVE
+#if __ARM_ARCH > 6
 	/* Set CPACR for access to CP10 and 11 */
 	__asm__("mcr p15, 0, %0, c1, c0, 2" : : "r" (0xf << 20));
+#endif
 	/* Enable FPU */
 	__asm__("vmsr fpexc, %0" : : "r" (0x40000000));
-#endif
 #endif
 
 	/* Branch to C code */

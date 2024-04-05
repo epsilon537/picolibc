@@ -33,9 +33,11 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define __STDC_WANT_IEC_60559_BFP_EXT__
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <math.h>
+#include <fenv.h>
 #include <stdlib.h>
 #ifdef _HAVE_COMPLEX
 #include <complex.h>
@@ -47,7 +49,7 @@ int i1;
 long int li1;
 long long int lli1;
 
-#ifdef _HAVE_LONG_DOUBLE
+#ifdef _TEST_LONG_DOUBLE
 long double l1, l2, l3;
 #endif
 
@@ -55,11 +57,15 @@ long double l1, l2, l3;
 double complex cd1, cd2, cd3;
 float complex cf1, cf2, cf3;
 
-#ifdef _HAVE_LONG_DOUBLE
+#ifdef _TEST_LONG_DOUBLE
 long double complex cl1, cl2, cl3;
 #endif
 
 #endif
+
+fexcept_t fex;
+fenv_t fen;
+femode_t fem;
 
 /*
  * Touch test to make sure all of the expected math functions exist
@@ -95,17 +101,19 @@ main(void)
 
     i1 = finite (d1);
     i1 = finitef (f1);
+#ifdef _TEST_LONG_DOUBLE
 #if defined(_HAVE_BUILTIN_FINITEL) || defined(_HAVE_BUILTIN_ISFINITE)
     i1 = finitel (l1);
 #endif
-    i1 = isinff (f1);
-    i1 = isnanf (f1);
 #ifdef _HAVE_BUILTIN_ISINFL
     i1 = isinfl (l1);
 #endif
 #ifdef _HAVE_BUILTIN_ISNANL
     i1 = isnanl (l1);
 #endif
+#endif
+    i1 = isinff (f1);
+    i1 = isnanf (f1);
     i1 = isinf (d1);
     i1 = isnan (d1);
 
@@ -230,7 +238,7 @@ main(void)
     f1 = log2f (f1);
     f1 = hypotf (f1, f2);
 
-#ifdef _HAVE_LONG_DOUBLE
+#ifdef _TEST_LONG_DOUBLE
     l1 = frexpl (l1, &i1);
     l1 = ldexpl (l1, i1);
     l1 = sqrtl (l1);
@@ -302,7 +310,7 @@ main(void)
     l1 = nextafterl (l1, l2);
     l1 = nexttowardl (l1, l2);
 #endif /* _HAVE_LONG_DOUBLE_MATH */
-#endif /* _HAVE_LONG_DOUBLE */
+#endif /* _TEST_LONG_DOUBLE */
 
     d1 = drem (d1, d2);
     f1 = dremf (f1, f2);
@@ -427,7 +435,7 @@ main(void)
     cf1 = clog10f(cf1);
 #endif
 
-#ifdef _HAVE_LONG_DOUBLE
+#ifdef _TEST_LONG_DOUBLE
     cl1 =  csqrtl(cl1);
     l1 = cabsl(cl1) ;
     cl1 = cprojl(cl1);
@@ -457,9 +465,31 @@ main(void)
 #endif
 #endif /* _HAVE_LONG_DOUBLE_MATH */
 
-#endif /* _HAVE_LONG_DOUBLE */
+#endif /* _TEST_LONG_DOUBLE */
 
 #endif /* _HAVE_COMPLEX */
-    
+
+    i1 = feclearexcept(FE_ALL_EXCEPT);
+    i1 = fegetexceptflag(&fex, FE_ALL_EXCEPT);
+    i1 = feraiseexcept(0);
+    i1 = fesetexceptflag(&fex, FE_ALL_EXCEPT);
+    i1 = fetestexcept(FE_ALL_EXCEPT);
+
+    i1 = fegetround();
+    i1 = fesetround(FE_TONEAREST);
+
+    i1 = fegetenv(&fen);
+    i1 = feholdexcept(&fen);
+    i1 = fesetenv(&fen);
+    i1 = feupdateenv(&fen);
+
+    i1 = feenableexcept(FE_ALL_EXCEPT);
+    i1 = fedisableexcept(FE_ALL_EXCEPT);
+    i1 = fegetexcept();
+
+    i1 = fegetmode(&fem);
+    i1 = fesetmode(&fem);
+    i1 = fesetexcept(FE_ALL_EXCEPT);
+
     return 0;
 }

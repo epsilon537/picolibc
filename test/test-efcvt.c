@@ -46,12 +46,18 @@ struct test {
     char        *expect;
 };
 
-struct test ecvt_tests[] = {
+const struct test ecvt_tests[] = {
     { 1.0e0,    4,   1, 0, "1000", },
     { -1.0e0,   4,   1, 1, "1000", },
     { 1.0e7,    7,   8, 0, "1000000" },
     { 1.0e-12,  4, -11, 0, "1000" },
 };
+
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#pragma GCC diagnostic ignored "-Wunused-value"
+#pragma GCC diagnostic ignored "-Woverflow"
+#pragma GCC diagnostic ignored "-Wliteral-range"
 
 #if !defined(TINY_STDIO) && !defined(NO_NEWLIB)
 #define ecvt_r(n, dig, dec, sign, buf, len) (ecvtbuf(n, dig, dec, sign, buf) ? 0 : -1)
@@ -63,7 +69,7 @@ struct test ecvt_tests[] = {
 
 #define N_ECVT_TESTS    (sizeof(ecvt_tests) / sizeof(ecvt_tests[0]))
 
-struct test fcvt_tests[] = {
+const struct test fcvt_tests[] = {
     { 0.0058882729652625027, 7, -2, 0, "58883", },
     { 1.0e0,    4,   1, 0, "10000", },
     { -1.0e0,   4,   1, 1, "10000", },
@@ -103,8 +109,11 @@ struct test fcvt_tests[] = {
 
 #define N_FCVT_TESTS    (sizeof(fcvt_tests) / sizeof(fcvt_tests[0]))
 
-struct test fcvt_extra_tests[] = {
+const struct test fcvt_extra_tests[] = {
 #ifdef TINY_STDIO
+#if __SIZEOF_DOUBLE__ == 4
+    { 0x1.fffffep127, 9, 39, 0, "340282350000000000000000000000000000000000000000" },
+#else
     { 0x1.fffffffffffffp1023, 17, 309, 0, "17976931348623157"
       "0000000000000000000000000000000000000000"
       "0000000000000000000000000000000000000000"
@@ -116,6 +125,7 @@ struct test fcvt_extra_tests[] = {
       "000000000000"
       "00000000000000000"},
     { 0x1.fffffep127, 9, 39, 0, "340282346638528860000000000000000000000000000000" },
+#endif
 #else
     { 0x1.fffffffffffffp1023, 17, 309, 0, "17976931348623157"
       "0814527423731704356798070567525844996598"
@@ -133,7 +143,7 @@ struct test fcvt_extra_tests[] = {
 
 #define N_FCVT_EXTRA_TESTS      (sizeof(fcvt_extra_tests) / sizeof(fcvt_extra_tests[0]))
 
-struct test fcvtf_tests[] = {
+const struct test fcvtf_tests[] = {
 #ifdef TINY_STDIO
     { 0x1.fffffep127, 9, 39, 0, "340282350000000000000000000000000000000000000000" },
 #else
@@ -149,6 +159,16 @@ struct test fcvtf_tests[] = {
 #define SKIP_LONG_FLOAT 1
 #else
 #define SKIP_LONG_FLOAT 0
+#endif
+
+#if (!defined(TINY_STDIO) || !defined(_IO_FLOAT_EXACT)) && __SIZEOF_DOUBLE__ < 8
+#undef SKIP_LONG_FLOAT
+#define SKIP_LONG_FLOAT 1
+#define SKIP_LONGISH_FLOAT 1
+#endif
+
+#ifndef SKIP_LONGISH_FLOAT
+#define SKIP_LONGISH_FLOAT 0
 #endif
 
 #define many_tests(tests, func, n, skip_long) do {                      \
@@ -184,13 +204,13 @@ main(void)
     unsigned i;
     static char buf[2048];
 
-    many_tests(fcvt_tests, fcvt_r, N_FCVT_TESTS, 0);
+    many_tests(fcvt_tests, fcvt_r, N_FCVT_TESTS, SKIP_LONGISH_FLOAT);
     many_tests(fcvt_extra_tests, fcvt_r, N_FCVT_EXTRA_TESTS, SKIP_LONG_FLOAT);
-    many_tests(ecvt_tests, ecvt_r, N_ECVT_TESTS, 0);
+    many_tests(ecvt_tests, ecvt_r, N_ECVT_TESTS, SKIP_LONGISH_FLOAT);
 #ifdef __PICOLIBC__
     many_tests(fcvt_tests, fcvtf_r, N_FCVT_TESTS, SKIP_LONG_FLOAT);
     many_tests(fcvtf_tests, fcvtf_r, N_FCVTF_TESTS, SKIP_LONG_FLOAT);
-    many_tests(ecvt_tests, ecvtf_r, N_ECVT_TESTS, 0);
+    many_tests(ecvt_tests, ecvtf_r, N_ECVT_TESTS, SKIP_LONGISH_FLOAT);
 #endif
     return error;
 }

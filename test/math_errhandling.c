@@ -41,6 +41,46 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdbool.h>
+
+#ifdef _HAVE_ATTRIBUTE_ALWAYS_INLINE
+#define ALWAYS_INLINE __inline__ __attribute__((__always_inline__))
+#else
+#define ALWAYS_INLINE __inline__
+#endif
+
+static ALWAYS_INLINE float
+opt_barrier_float (float x)
+{
+  volatile float y = x;
+  return y;
+}
+
+static ALWAYS_INLINE double
+opt_barrier_double (double x)
+{
+  volatile double y = x;
+  return y;
+}
+
+#if __SIZEOF_LONG_DOUBLE__ > 0
+static ALWAYS_INLINE long double
+opt_barrier_long_double (long double x)
+{
+  volatile long double y = x;
+  return y;
+}
+#endif
+
+#ifdef __clang__
+#define clang_barrier_long_double(x) opt_barrier_long_double(x)
+#define clang_barrier_double(x) opt_barrier_double(x)
+#define clang_barrier_float(x) opt_barrier_float(x)
+#else
+#define clang_barrier_long_double(x) (x)
+#define clang_barrier_double(x) (x)
+#define clang_barrier_float(x) (x)
+#endif
 
 static const char *
 e_to_str(int e)
@@ -134,8 +174,21 @@ e_to_str(int e)
 
 #define scat(a,b) a ## b
 
+#ifdef __mcffpu__
+#define SKIP_SNAN_CHECKS
+#endif
+
+#ifdef __HAVE_68881__
+#define SKIP_SNAN_CHECKS
+#endif
+
+#if defined(__m68k__) && !defined(__mcoldfire__) && !defined(__HAVE_M68881__)
+#undef _TEST_LONG_DOUBLE
+#define NO_NEXTTOWARD
+#endif
+
 /* Tests with long doubles */
-#ifdef __SIZEOF_LONG_DOUBLE__
+#ifdef _TEST_LONG_DOUBLE
 
 #if defined(__PICOLIBC__) && !defined(_HAVE_LONG_DOUBLE_MATH)
 #define SIMPLE_MATH_ONLY
@@ -166,15 +219,17 @@ e_to_str(int e)
 #define BIGODD  0x1.123456789abcdef2p+63l
 #define BIGEVEN 0x1.123456789abcdef0p+63l
 #else
-#define BIGODD  0x1.123456789abcdp+52
-#define BIGEVEN 0x1.123456789abccp+52
+#define BIGODD  0x1.123456789abcdp+52l
+#define BIGEVEN 0x1.123456789abccp+52l
 #endif
 #define SMALL __LDBL_DENORM_MIN__
 #define FLOAT_T long double
 #define MIN_VAL __LDBL_DENORM_MIN__
 #define MAX_VAL __LDBL_MAX__
+#define MANT_DIG __LDBL_MANT_DIG__
 #define EPSILON_VAL __LDBL_EPSILON__
 #define sNAN __builtin_nansl("")
+#define force_eval(x) clang_barrier_long_double(x)
 
 #define TEST_LONG_DOUBLE
 
@@ -189,7 +244,9 @@ e_to_str(int e)
 #undef SMALL
 #undef MIN_VAL
 #undef MAX_VAL
+#undef MANT_DIG
 #undef EPSILON_VAL
+#undef force_eval
 #undef sNAN
 #undef makemathname
 #undef makemathname_r
@@ -209,15 +266,24 @@ e_to_str(int e)
 #endif
 #define DOUBLE_EXCEPTION_TEST EXCEPTION_TEST
 
+#if __SIZEOF_DOUBLE__ == 4
+#define BIG 3e38
+#define BIGODD  0x1.123456p+23
+#define BIGEVEN 0x1.123454p+23
+#define SMALL 1e-45
+#else
 #define BIG 1.7e308
 #define BIGODD  0x1.123456789abcdp+52
 #define BIGEVEN 0x1.123456789abccp+52
 #define SMALL 5e-324
+#endif
 #define FLOAT_T double
 #define MIN_VAL __DBL_DENORM_MIN__
 #define MAX_VAL __DBL_MAX__
+#define MANT_DIG __DBL_MANT_DIG__
 #define EPSILON_VAL __DBL_EPSILON__
 #define sNAN __builtin_nans("")
+#define force_eval(x) clang_barrier_double(x)
 #define PI_VAL M_PI
 
 #define TEST_DOUBLE
@@ -233,7 +299,9 @@ e_to_str(int e)
 #undef SMALL
 #undef MIN_VAL
 #undef MAX_VAL
+#undef MANT_DIG
 #undef EPSILON_VAL
+#undef force_eval
 #undef sNAN
 #undef makemathname
 #undef makemathname_r
@@ -250,8 +318,10 @@ e_to_str(int e)
 #define SMALL 1e-45
 #define MIN_VAL 0x8p-152f
 #define MAX_VAL 0xf.fffffp+124f
+#define MANT_DIG __FLT_MANT_DIG__
 #define EPSILON_VAL 0x1p-23f
 #define sNAN __builtin_nansf("")
+#define force_eval(x) clang_barrier_float(x)
 #define FLOAT_T float
 #define TEST_FLOAT
 #define makemathname(s) scat(s,f)
@@ -264,12 +334,18 @@ int main(void)
 {
 	int result = 0;
 
-#if DOUBLE_EXCEPTION_TEST
 	printf("Double tests:\n");
 	result += run_tests();
-#endif
-#ifdef LONG_DOUBLE_EXCEPTION_TEST
+#ifdef _TEST_LONG_DOUBLE
 	printf("Long double tests:\n");
+#ifdef __m68k__
+        volatile long double zero = 0.0L;
+        volatile long double one = 1.0L;
+        volatile long double check = nextafterl(zero, one);
+        if (check + check == zero) {
+            printf("m68k emulating long double with double, skipping\n");
+        } else
+#endif
 	result += run_testsl();
 #endif
 	printf("Float tests:\n");

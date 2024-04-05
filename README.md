@@ -1,5 +1,5 @@
 # Picolibc
-Copyright © 2018-2022 Keith Packard
+Copyright © 2018-2023 Keith Packard
 
 Picolibc is library offering standard C library APIs that targets
 small embedded systems with limited RAM. Picolibc was formed by blending
@@ -9,6 +9,7 @@ code from [Newlib](http://sourceware.org/newlib/) and
 Build status:
 
  * ![Linux](https://github.com/picolibc/picolibc/workflows/Linux/badge.svg?branch=main)
+ * ![Zephyr](https://github.com/picolibc/picolibc/workflows/Zephyr/badge.svg?branch=main)
  * ![Mac OS X](https://github.com/picolibc/picolibc/workflows/Mac%20OS%20X/badge.svg)
 
 ## License
@@ -34,21 +35,27 @@ scripts.
 
 ## Supported Architectures
 
-Picolibc inherited code for a *lot* of architectures from Newlib, but
-at this point only has code to build for the following targets:
+Picolibc has integrated testing support for many architectures which
+is used to validate the code for all patch integration:
 
  * ARC (32- and 64- bit)
  * ARM (32- and 64- bit)
  * i386 (Native and Linux hosted, for testing)
- * Microblaze (32-bit, big and little endian)
  * Motorola 68000 (m68k)
  * MIPS
  * MSP430
  * Nios II
- * PowerPC (big and little endian)
+ * Power9
  * RISC-V (both 32- and 64- bit)
- * Sparc64
+ * SparcV8 (32 bit)
  * x86_64 (Native and Linux hosted, for testing)
+
+There is also build infrastructure and continuous build validation,
+but no integrated testing available for additional architectures:
+
+ * Microblaze (32-bit, big and little endian)
+ * PowerPC (big and little endian)
+ * Sparc64
  * Xtensa (ESP8266, ESP32)
 
 Supporting architectures that already have Newlib code requires:
@@ -68,8 +75,8 @@ Supporting architectures that already have Newlib code requires:
  3. newlib/libm/machine/_architecture_/meson.build to build any
     architecture-specific libm bits
 
- 4. picocrt/machine/_architecture_ source code and build bits if you
-    need custom startup code for the architecture. Useful in all
+ 4. picocrt/machine/_architecture_ source code and build bits
+    for startup code needed for the architecture. Useful in all
     cases, but this is necessary to run tests under qemu if your
     platform can do that.
 
@@ -131,11 +138,207 @@ use Picolibc:
  * [Printf and Scanf in Picolibc](doc/printf.md)
  * [Thread Local Storage](doc/tls.md)
  * [Re-entrancy and Locking](doc/locking.md)
+ * [Selecting ctype implementation](doc/ctype.md)
  * [Picolibc as embedded source](doc/embedsource.md)
  * [Releasing Picolibc](doc/releasing.md)
  * [Copyright and license information](COPYING.picolibc)
 
 ## Releases
+
+### Picolibc version 1.8.6
+
+ * Fix some FORTITY_SOURCE issues with tinystdio
+
+ * Add __eh_* symbols to picolibc.ld for LLVM libunwind. Thanks Alex
+   Richardson.
+
+ * Merge in newlib annual release (4.4.0). Some minor updates to
+   aarch64 assembly code formatting (thanks to Sebastian Huber) and a
+   few other fixes.
+
+ * Enable 32-bit SPARC for testing.
+
+ * Fix a bunch of fmemopen bugs and add some tests. Thanks to Alex
+   Richardson.
+
+ * Finish support for targets with unusual float types, mapping
+   target types to 32-, 64-, 80- and 128- bit picolibc code.
+
+ * Add SuperH support, including testing infrastructure. Thanks to
+   Adrian Siekierka for help with this.
+
+ * Improve debugger stack trace in risc-v exception code. Thanks to
+   Alex Richardson.
+
+ * Add an option (-Dfast-bufio=true) for more efficient fread/fwrite
+   implementations when layered atop bufio. Thanks for the suggestion
+   from Zachary Yedidia.
+
+ * Fix cmake usage of FORMAT_ variables (note the lack of a leading
+   underscore).
+
+ * Remove explicit _POSIX_C_SOURCE definition in zephyr/zephr.cmake.
+
+ * Clean up public inline functions to share a common mechanism for
+   using gnu_inline semantics. Fix isblank. This ensures that no
+   static inline declarations exist in public API headers which are
+   required to be external linkage ("real") symbols.
+
+ * Create an alternate ctype implementation that avoids using the
+   _ctype_ array and just does direct value comparisons. This only
+   works when picolibc is limited to ASCII. Applications can select
+   whether they want this behavior at application compilation time
+   without needing to rebuild the C library. Thanks to P. Frost for
+   the suggestion.
+
+ * Unify most fenv implementations to use gnu_inline instead of
+   regular functions to improve performance. x86 was left out because
+   those fenv functions are complicated by the mix of 8087 and modern
+   FPU support.
+
+ * Add a separate FILE for stderr when using POSIX I/O. Split
+   stdin/stdout/stderr into three files to avoid pulling in
+   those which aren't used. Thanks to Zachary Yedidia.
+
+### Picolibc version 1.8.5
+
+ * Detect clang multi-lib support correctly by passing compiler flags.
+   Thanks to xbjfk for identifying the problem.
+
+ * Create a new 'long-long' printf variant. This provides enough
+   variety to satisfy the Zephyr cbprintf options without needing to
+   build the library from scratch.
+
+ * Adjust use of custom binary to decimal conversion code so that it
+   is only enabled for types beyond the register size of the
+   target. This avoids the cost of this code when the application is
+   already likely to be using the soft division routines.
+
+### Picolibc version 1.8.4
+
+ * Make math overflow and underflow handlers respect rounding modes.
+
+ * Add full precision fma/fmaf fallbacks by adapting the long-double
+   code which uses two floats/doubles and some careful exponent
+   management to ensure that only a single rounding operation occurs.
+
+ * Fix more m68k 80-bit float bugs
+
+ * Fix m68k asm ABI by returning pointers in %a0 and %d0
+
+ * Use an m68k-unknown-elf toolchain for m68k testing, including
+   multi-lib to check various FPU configurations on older and more
+   modern 68k targets.
+
+ * Improve CI speed by using ccache on zephyr and mac tests,
+   compressing the docker images and automatically canceling jobs when
+   the related PR is updated. Thanks to Peter Jonsson.
+
+ * Move a bunch of read-only data out of RAM and into flash by adding
+   'const' attributes in various places.
+
+ * Add a new linker symbol, `__heap_size_min`, which specifies a
+   minimum heap size. The linker will emit an error if this much space
+   is not available between the end of static data and the stack.
+
+ * Fix a bunch of bugs on targets with 16-bit int type. Thanks to
+   Peter Jonsson for many of these.
+
+ * Work around a handful of platform bugs on MSP430. I think these are
+   compiler bugs as they occur using both the binutils simulator and
+   mspsim.
+
+ * Run tests on MSP430 using the simulator that comes with gdb. Thanks to
+   Peter Jonsson for spliting tests apart to make them small enough to
+   link in under 1MB. This requires a patch adding primitive
+   semihosting to the simulator.
+
+ * Provide a division-free binary to decimal conversion option for
+   printf at friends. This is useful on targets without hardware
+   divide as it avoids pulling in a (usually large) software
+   implementation. This is controlled with the 'printf-small-ultoa'
+   meson option and is 'false' by default.
+
+ * Add 'minimal' printf and scanf variants. These reduce functionality
+   by removing code that acts on most data modifers including width
+   and precision fields and alternate presentation modes. A new config
+   variable, minimal-io-long-long, controls whether that code supports
+   long long types.
+
+ * Add a 'assert-verbose' option which controls whether the assert
+   macro is chatty by default. It is 'true' by default, which
+   preserves the existing code, but when set to 'false', then a
+   failing assert calls __assert_no_msg with no arguments, saving the
+   memory usually occupied by the filename, function name and
+   expression.
+
+ * Fix arm asm syntax for mrc/mcr instructions to make clang happy.
+   Thanks to Radovan Blažek for this patch.
+
+### Picolibc version 1.8.3
+
+ * Fix bugs in floor and ceil implementations.
+
+ * Use -fanalyzer to find and fix a range of issues.
+
+ * Add __ubsan_handle_out_of_bounds implementation. This enables
+   building applications with -fsanitize=bounds and
+   -fno-sanitize-undefined-trap-on-error.
+
+ * Validate exception configuration on targets with mixed exception
+   support where some types have exceptions and others don't. Right
+   now, that's only arm platforms where any soft float implementations
+   don't build with exception support.
+
+ * Fix bugs in nexttowards/nextafter on clang caused by the compiler
+   re-ordering code and causing incorrect exception generation.
+
+ * Use the small/slow string code when -fsanitize=address is used
+   while building the library. This avoids reading beyond the end of
+   strings and triggering faults.
+
+ * Handle soft float on x86 and sparc targets. That mostly required
+   disabling the hardware exception API, along with a few other minor
+   bug fixes.
+
+ * Add runtime support for arc, mips, nios2 and m68k. This enables CI
+   testing on these architectures using qemu.
+
+ * Fix 80-bit floating math library support for m68k targets.
+
+ * Fix arm testing infra to use various qemu models that expand
+   testing to all standard multi-lib configurations.
+
+ * Adjust floating exception stubs to return success when appropriate,
+   instead of always returning ENOSYS.
+
+ * Make sure sNaN raises FE_INVALID and is converted to qNaN in
+   truncl, frexpl and roundl
+
+ * Avoid NaN result from fmal caused by multiply overflow when
+   addend is infinity (-inf + inf results in NaN in that case).
+
+### Picolibc version 1.8.2
+
+ * Support _ZEPHYR_SOURCE macro which, like _POSIX_SOURCE et al,
+   controls whether the library expresses the Zephyr C library API.
+   This is also automatically selected when the __ZEPHYR__ macro is
+   defined and no other _*_SOURCE macro is defined.
+
+ * Add another cross compile property, 'libgcc', which specifies the
+   library containing soft float and other compiler support routines.
+
+ * Fix a couple of minor imprecisions in pow and 80-bit powl.
+
+ * Merge newlib changes that included an update to the ARM assembly
+   code.
+
+ * Replace inexact float/string conversion code with smaller code that
+   doesn't use floating point operations to save additional space on
+   soft float targets.
+
+ * More cmake fixes, including making the inexact printf and locale
+   options work.
 
 ### Picolibc version 1.8.1
 
