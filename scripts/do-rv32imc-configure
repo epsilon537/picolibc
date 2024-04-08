@@ -37,5 +37,6 @@ version=`riscv32-unknown-elf-gcc --version | awk '/gcc/ { print $NF }'`
 echo "version" "$version"
 arch=rv32imc_zicsr
 exec "$(dirname "$0")"/do-configure "$arch" \
+     -Dpicocrt=false \
      -Dtests=false \
      -Dmultilib=false "$@"
