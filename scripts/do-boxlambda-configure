@@ -33,9 +33,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 # OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-version=`riscv32-unknown-elf-gcc --version | awk '/gcc/ { print $NF }'`
+version=`riscv32-boxlambda-elf-gcc --version | awk '/gcc/ { print $NF }'`
 echo "version" "$version"
-arch=rv32im_zicsr
+arch=boxlambda
 exec "$(dirname "$0")"/do-configure "$arch" \
      -Dpicocrt=false \
      -Dtests=false \

@@ -1,11 +1,11 @@
 [binaries]
-c = ['riscv64-unknown-elf-gcc', '-nostdlib']
-ar = 'riscv64-unknown-elf-ar'
-as = 'riscv64-unknown-elf-as'
-nm = 'riscv64-unknown-elf-nm'
-strip = 'riscv64-unknown-elf-strip'
+c = ['riscv32-boxlambda-elf-gcc', '-nostdlib']
+ar = 'riscv32-boxlambda-elf-ar'
+as = 'riscv32-boxlambda-elf-as'
+nm = 'riscv32-boxlambda-elf-nm'
+strip = 'riscv32-boxlambda-elf-strip'
 # only needed to run tests
-exe_wrapper = ['sh', '-c', 'test -z "$PICOLIBC_TEST" || run-rv32im "$@"', 'run-rv32im']
+exe_wrapper = ['sh', '-c', 'test -z "$PICOLIBC_TEST" || run-rv32imic "$@"', 'run-rv32imc']
 
 [host_machine]
 system = 'unknown'
